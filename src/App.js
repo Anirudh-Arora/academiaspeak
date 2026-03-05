@@ -49,15 +49,25 @@ For every situation, generate **all five of the following**, in this EXACT forma
 - Always end on a note of solidarity`;
 
 // ── PARSER ───────────────────────────────────────────────────────────────────
+// Strip markdown bold/italic syntax from a string
+function stripMd(str) {
+  if (!str) return str;
+  return str
+    .replace(/\*\*(.+?)\*\*/gs, '$1')
+    .replace(/\*(.+?)\*/gs, '$1')
+    .replace(/^>\s*/gm, '')
+    .trim();
+}
+
 function parseResponse(text) {
   const sections = {};
 
   const patterns = {
-    official: /###\s*1\.\s*🎓\s*THE OFFICIAL RESPONSE\s*\n([\s\S]*?)(?=###\s*2\.|$)/i,
-    reframe:  /###\s*2\.\s*🔬\s*THE SCIENTIFIC REFRAME\s*\n([\s\S]*?)(?=###\s*3\.|$)/i,
+    official:    /###\s*1\.\s*🎓\s*THE OFFICIAL RESPONSE\s*\n([\s\S]*?)(?=###\s*2\.|$)/i,
+    reframe:     /###\s*2\.\s*🔬\s*THE SCIENTIFIC REFRAME\s*\n([\s\S]*?)(?=###\s*3\.|$)/i,
     translation: /###\s*3\.\s*😅\s*THE TRANSLATION\s*\n([\s\S]*?)(?=###\s*4\.|$)/i,
-    shield:   /###\s*4\.\s*🛡️\s*THE DEFENSE SHIELD\s*\n([\s\S]*?)(?=###\s*5\.|$)/i,
-    rating:   /###\s*5\.\s*🏅\s*CRISIS SEVERITY RATING\s*\n([\s\S]*?)$/i,
+    shield:      /###\s*4\.\s*🛡️\s*THE DEFENSE SHIELD\s*\n([\s\S]*?)(?=###\s*5\.|$)/i,
+    rating:      /###\s*5\.\s*🏅\s*CRISIS SEVERITY RATING\s*\n([\s\S]*?)$/i,
   };
 
   for (const [key, pattern] of Object.entries(patterns)) {
@@ -65,37 +75,39 @@ function parseResponse(text) {
     sections[key] = match ? match[1].trim() : null;
   }
 
-  // Parse translation inline
+  // Parse translation — strip any repeated label and markdown
   if (sections.translation) {
-    const tMatch = sections.translation.match(/\*"(.+?)"\*/);
-    sections.translationText = tMatch ? tMatch[1] : sections.translation;
+    let t = sections.translation;
+    t = t.replace(/\*{0,2}What this actually means:\*{0,2}\s*/gi, '');
+    const quoted = t.match(/["""](.+?)["""]/s) || t.match(/"(.+?)"/s);
+    sections.translationText = quoted ? stripMd(quoted[1]) : stripMd(t);
   }
 
-  // Parse shield lines
+  // Parse shield lines — strip markdown from each
   if (sections.shield) {
-    const safe    = sections.shield.match(/🟢\s*\*{0,2}Safe\*{0,2}:\s*(.+)/i);
-    const bold    = sections.shield.match(/🟡\s*\*{0,2}Bold\*{0,2}:\s*(.+)/i);
-    const nuclear = sections.shield.match(/🔴\s*\*{0,2}Nuclear\*{0,2}:\s*(.+)/i);
+    const safe    = sections.shield.match(/🟢\s*\*{0,2}Safe\*{0,2}:\s*([\s\S]+?)(?=🟡|$)/i);
+    const bold    = sections.shield.match(/🟡\s*\*{0,2}Bold\*{0,2}:\s*([\s\S]+?)(?=🔴|$)/i);
+    const nuclear = sections.shield.match(/🔴\s*\*{0,2}Nuclear\*{0,2}:\s*([\s\S]+?)$/i);
     sections.shieldLines = {
-      safe:    safe    ? safe[1].trim()    : null,
-      bold:    bold    ? bold[1].trim()    : null,
-      nuclear: nuclear ? nuclear[1].trim() : null,
+      safe:    safe    ? stripMd(safe[1].trim())    : null,
+      bold:    bold    ? stripMd(bold[1].trim())    : null,
+      nuclear: nuclear ? stripMd(nuclear[1].trim()) : null,
     };
   }
 
   // Parse rating
   if (sections.rating) {
     const levelMatch    = sections.rating.match(/Level\s*(\d)/i);
-    const classMatch    = sections.rating.match(/Level\s*\d+\s*[—–-]\s*\*{0,2}(.+?)\*{0,2}\n/i);
-    const verdictMatch  = sections.rating.match(/Level.+\n([^\n]+)/i);
+    const classMatch    = sections.rating.match(/Level\s*\d+\s*[—–-]\s*\*{0,2}(.+?)\*{0,2}(?:\n|$)/i);
+    const verdictMatch  = sections.rating.match(/Level.+?\n([^\n]+)/i);
     const timelineMatch = sections.rating.match(/Recommended Recovery Timeline:\s*\*{0,2}(.+?)\*{0,2}(?:\n|$)/i);
-    const adviceMatch   = sections.rating.match(/One Genuine Piece of Advice:\s*\*{0,2}(.+)/i);
+    const adviceMatch   = sections.rating.match(/One Genuine Piece of Advice:\s*\*{0,2}([\s\S]+?)(?:\n\n|$)/i);
     sections.ratingParsed = {
-      level:    levelMatch    ? parseInt(levelMatch[1])    : null,
-      class:    classMatch    ? classMatch[1].trim()       : null,
-      verdict:  verdictMatch  ? verdictMatch[1].trim()     : null,
-      timeline: timelineMatch ? timelineMatch[1].trim()    : null,
-      advice:   adviceMatch   ? adviceMatch[1].trim()      : null,
+      level:    levelMatch    ? parseInt(levelMatch[1])          : null,
+      class:    classMatch    ? stripMd(classMatch[1].trim())    : null,
+      verdict:  verdictMatch  ? stripMd(verdictMatch[1].trim())  : null,
+      timeline: timelineMatch ? stripMd(timelineMatch[1].trim()) : null,
+      advice:   adviceMatch   ? stripMd(adviceMatch[1].trim())   : null,
     };
   }
 
@@ -563,10 +575,10 @@ export default function App() {
                 <SectionCard
                   icon="🎓" title="THE OFFICIAL RESPONSE"
                   accentColor="#c8b84a" delay={0}
-                  action={<CopyButton text={result.parsed.official.replace(/\*\*/g, "")} />}
+                  action={<CopyButton text={stripMd(result.parsed.official)} />}
                 >
                   <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.85, color: "#d8d8b8", fontFamily: "'IM Fell English', serif" }}>
-                    {result.parsed.official.replace(/\*\*/g, "")}
+                    {stripMd(result.parsed.official)}
                   </p>
                 </SectionCard>
               )}
@@ -575,7 +587,7 @@ export default function App() {
               {result.parsed.reframe && (
                 <SectionCard icon="🔬" title="THE SCIENTIFIC REFRAME" accentColor="#7dd3fc" delay={150}>
                   <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.8, color: "#a8cce8", fontStyle: "italic", fontFamily: "'IM Fell English', serif" }}>
-                    {result.parsed.reframe.replace(/\*\*/g, "")}
+                    {stripMd(result.parsed.reframe)}
                   </p>
                 </SectionCard>
               )}
