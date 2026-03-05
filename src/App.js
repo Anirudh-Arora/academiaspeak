@@ -262,7 +262,7 @@ export default function App() {
 
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -687,7 +687,7 @@ export default function App() {
           fontSize: "0.55rem", color: "#2a2a1e", letterSpacing: "0.1em",
           display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem",
         }}>
-          <span>AcademiaSpeak™ v3.7.1 — Powered by Gemini 1.5 Flash</span>
+          <span>AcademiaSpeak™ v3.7.1 — Powered by Gemini 2.0 Flash</span>
           <span>Cited by zero papers. Saved by countless careers.</span>
         </div>
       </div>
