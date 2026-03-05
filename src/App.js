@@ -206,7 +206,7 @@ function SectionCard({ icon, title, accentColor = "#c8b84a", children, action, d
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("as_apikey") || "");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("as_gemini_key") || "");
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [situation, setSituation] = useState("");
   const [modifiers, setModifiers] = useState({ field: "", audience: "", tone: "", short: false, twitter: false });
@@ -236,7 +236,7 @@ export default function App() {
   }, [loading]);
 
   const saveKey = (k) => {
-    localStorage.setItem("as_apikey", k);
+    localStorage.setItem("as_gemini_key", k);
     setApiKey(k);
     setShowKeyInput(false);
   };
@@ -261,21 +261,24 @@ export default function App() {
     setLoadingPhase(0);
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1500,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: buildPrompt() }],
-        }),
-      });
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{ role: "user", parts: [{ text: buildPrompt() }] }],
+            generationConfig: { maxOutputTokens: 1500, temperature: 0.9 },
+          }),
+        }
+      );
 
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
 
-      const text = data.content.map(b => b.text || "").join("\n");
+      const text = data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("\n") || "";
+      if (!text) throw new Error("Empty response from Gemini. Please try again.");
       const parsed = parseResponse(text);
       setResult({ raw: text, parsed });
 
@@ -372,7 +375,7 @@ export default function App() {
           {!showKeyInput && (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <span style={{ fontSize: "0.6rem", color: "#5a5a3a", letterSpacing: "0.15em" }}>
-                API KEY: {apiKey ? "●●●●●●●●●●●●" + apiKey.slice(-4) : "NOT SET"}
+                API KEY: {apiKey ? "●●●●●●●●●●●●" + apiKey.slice(-4) : "NOT SET — GEMINI KEY REQUIRED"}
               </span>
               <button
                 onClick={() => setShowKeyInput(true)}
@@ -390,7 +393,7 @@ export default function App() {
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
               <input
                 type="password"
-                placeholder="sk-ant-..."
+                placeholder="AIza..."
                 defaultValue={apiKey}
                 onKeyDown={e => e.key === "Enter" && saveKey(e.target.value)}
                 style={{
@@ -423,7 +426,7 @@ export default function App() {
             </div>
           )}
           <p style={{ margin: "0.4rem 0 0", fontSize: "0.58rem", color: "#3a3a28", letterSpacing: "0.08em" }}>
-            Your API key is stored locally in your browser. Never sent to any server except Anthropic.
+            Your Gemini API key is stored locally in your browser. Never sent anywhere except Google.
           </p>
         </div>
 
@@ -684,7 +687,7 @@ export default function App() {
           fontSize: "0.55rem", color: "#2a2a1e", letterSpacing: "0.1em",
           display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem",
         }}>
-          <span>AcademiaSpeak™ v3.7.1 — Powered by Claude</span>
+          <span>AcademiaSpeak™ v3.7.1 — Powered by Gemini 1.5 Flash</span>
           <span>Cited by zero papers. Saved by countless careers.</span>
         </div>
       </div>
