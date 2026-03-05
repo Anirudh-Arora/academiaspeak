@@ -206,7 +206,7 @@ function SectionCard({ icon, title, accentColor = "#c8b84a", children, action, d
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("as_gemini_key") || "");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("as_groq_key") || "");
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [situation, setSituation] = useState("");
   const [modifiers, setModifiers] = useState({ field: "", audience: "", tone: "", short: false, twitter: false });
@@ -236,7 +236,7 @@ export default function App() {
   }, [loading]);
 
   const saveKey = (k) => {
-    localStorage.setItem("as_gemini_key", k);
+    localStorage.setItem("as_groq_key", k);
     setApiKey(k);
     setShowKeyInput(false);
   };
@@ -261,24 +261,28 @@ export default function App() {
     setLoadingPhase(0);
 
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents: [{ role: "user", parts: [{ text: buildPrompt() }] }],
-            generationConfig: { maxOutputTokens: 1500, temperature: 0.9 },
-          }),
-        }
-      );
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          max_tokens: 1500,
+          temperature: 0.9,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: buildPrompt() },
+          ],
+        }),
+      });
 
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
 
-      const text = data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("\n") || "";
-      if (!text) throw new Error("Empty response from Gemini. Please try again.");
+      const text = data.choices?.[0]?.message?.content || "";
+      if (!text) throw new Error("Empty response. Please try again.");
       const parsed = parseResponse(text);
       setResult({ raw: text, parsed });
 
@@ -375,7 +379,7 @@ export default function App() {
           {!showKeyInput && (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <span style={{ fontSize: "0.6rem", color: "#5a5a3a", letterSpacing: "0.15em" }}>
-                API KEY: {apiKey ? "●●●●●●●●●●●●" + apiKey.slice(-4) : "NOT SET — GEMINI KEY REQUIRED"}
+                API KEY: {apiKey ? "●●●●●●●●●●●●" + apiKey.slice(-4) : "NOT SET — GROQ KEY REQUIRED"}
               </span>
               <button
                 onClick={() => setShowKeyInput(true)}
@@ -393,7 +397,7 @@ export default function App() {
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
               <input
                 type="password"
-                placeholder="AIza..."
+                placeholder="gsk_..."
                 defaultValue={apiKey}
                 onKeyDown={e => e.key === "Enter" && saveKey(e.target.value)}
                 style={{
@@ -426,7 +430,7 @@ export default function App() {
             </div>
           )}
           <p style={{ margin: "0.4rem 0 0", fontSize: "0.58rem", color: "#3a3a28", letterSpacing: "0.08em" }}>
-            Your Gemini API key is stored locally in your browser. Never sent anywhere except Google.
+            Your Groq API key is stored locally in your browser. Never sent anywhere except Groq.
           </p>
         </div>
 
@@ -687,7 +691,7 @@ export default function App() {
           fontSize: "0.55rem", color: "#2a2a1e", letterSpacing: "0.1em",
           display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem",
         }}>
-          <span>AcademiaSpeak™ v3.7.1 — Powered by Gemini 2.0 Flash</span>
+          <span>AcademiaSpeak™ v3.7.1 — Powered by Llama 3.3 via Groq</span>
           <span>Cited by zero papers. Saved by countless careers.</span>
         </div>
       </div>
